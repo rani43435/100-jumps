@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>100 Jumps</title>
+
+    <!-- Open Graph -->
+    <meta name="description" content="Hold to charge, release to jump. Land on 100 platforms to win — but one miss and it's over. How many attempts will it take you?">
+    <meta property="og:title" content="100 Jumps">
+    <meta property="og:description" content="Hold to charge, release to jump. Land on 100 platforms to win — but one miss and it's over. How many attempts will it take you?">
+    <meta property="og:image" content="https://hundred-jumps-recreation.braveskink19.chatgpt.site/assets/og-image.png">
+    <meta property="og:url" content="https://hundred-jumps-recreation.braveskink19.chatgpt.site/">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="100 Jumps">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="100 Jumps">
+    <meta name="twitter:description" content="Hold to charge, release to jump. Land on 100 platforms to win — but one miss and it's over. How many attempts will it take you?">
+    <meta name="twitter:image" content="https://hundred-jumps-recreation.braveskink19.chatgpt.site/assets/og-image.png">
+    <link rel="canonical" href="https://hundred-jumps-recreation.braveskink19.chatgpt.site/">
+
+    <!-- PWA -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#EDF2F8">
+    <link rel="icon" href="assets/favicon.ico" sizes="any">
+
+    <!-- iOS Safari full-screen / transparent status bar -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="100 Jumps">
+    <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
+
+    <!-- Longitude ad SDK — runs here in the parent, off the game's thread -->
+
+
+
+
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body {
+            width: 100%; height: 100%;
+            overflow: hidden;
+            background: #EDF2F8;
+        }
+
+        #game-frame {
+            position: fixed;
+            top: 0; bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100%;
+            max-width: 700px;
+            height: 100%;
+            border: none;
+            z-index: 1;
+        }
+
+        /* ── Display ad placements ── */
+        #ad-adhesion-wrap {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            height: 100px;
+            background: #EDF2F8;
+            z-index: 100;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+        #ad-adhesion {
+            width: 320px; height: 100px;
+            contain: strict;
+            content-visibility: auto;
+        }
+        #ad-rail-left,
+        #ad-rail-right {
+            position: fixed;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 300px; height: 600px;
+            background: #EDF2F8;
+            z-index: 100;
+            contain: strict;
+            content-visibility: auto;
+        }
+        #ad-rail-left {
+            right: calc(50% + 350px + 40px);
+        }
+        #ad-rail-right {
+            left: calc(50% + 350px + 40px);
+        }
+        body.dark {
+            background: #111827;
+        }
+        body.dark #ad-adhesion-wrap,
+        body.dark #ad-rail-left,
+        body.dark #ad-rail-right {
+            background: #111827;
+        }
+
+        @media (max-width: 1024px) {
+            #ad-adhesion-wrap {
+                display: flex;
+            }
+            #game-frame {
+                max-width: 100%;
+                height: calc(100% - 100px);
+            }
+            #ad-rail-left,
+            #ad-rail-right {
+                display: none;
+            }
+        }
+        @media (min-width: 1025px) and (max-width: 1399px) {
+            #ad-rail-left,
+            #ad-rail-right {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Display ad slots -->
+<div id="ad-adhesion-wrap"><div id="ad-adhesion"><div class='lngtd-adhesion' style="min-height:100px; align-items: center; justify-content: center; display: flex;"></div></div></div>
+<div id="ad-rail-left"><div class='lngtd-leftrail' style="min-height:90px; align-items: center; justify-content: center; display: flex;"></div></div>
+<div id="ad-rail-right"><div class='lngtd-rightrail' style="min-height:90px; align-items: center; justify-content: center; display: flex;"></div></div>
+
+<!-- Game runs in a cross-origin iframe for thread isolation -->
+<iframe id="game-frame" src="game.html" allow="autoplay; fullscreen"></iframe>
+
+<script>
+var gameFrame = document.getElementById('game-frame');
+
+window.addEventListener('message', function(e) {
+    var data = e.data;
+    if (!data || data.channel !== 'game-ad-request') return;
+
+    var id = data.id;
+    var source = e.source;
+
+    if (typeof lngtd === 'undefined' || !lngtd || typeof lngtd.triggerInterstitial !== 'function') {
+        console.log('[AD-PARENT] SDK not available, granting reward');
+        source.postMessage({ channel: 'game-ad-response', id: id, result: 'no-sdk' }, '*');
+        return;
+    }
+
+    console.log('[AD-PARENT] Rewarded ad request received');
+
+    var done = false;
+    function respond(result) {
+        if (done) return;
+        done = true;
+        console.log('[AD-PARENT] Ad result:', result);
+        source.postMessage({ channel: 'game-ad-response', id: id, result: result }, '*');
+    }
+
+    lngtd.triggerInterstitial({
+        type: 'reward',
+        name: 'reward',
+        beforeAd: function() {},
+        adBreakDone: function() { respond('viewed'); },
+        minViewTime: 10000,
+        maxAdLength: 35000,
+        maxAdBreak: 35000,
+        rewardText: 'Revive in',
+        rewardCloseWarningText: 'You will not be able to continue'
+    }, 'reward');
+});
+
+window.addEventListener('message', function(e) {
+    if (e.data && e.data.channel === 'game-theme') {
+        if (e.data.background && /^#[0-9a-f]{6}$/i.test(e.data.background)) document.body.style.background = e.data.background;
+        if (e.data.dark) document.body.classList.add('dark');
+        else document.body.classList.remove('dark');
+    }
+});
+
+gameFrame.addEventListener('load', function() { gameFrame.focus(); });
+document.addEventListener('click', function() { gameFrame.focus(); });
+
+document.addEventListener('keydown', function(e) {
+    if (e.code === 'Space') {
+        e.preventDefault();
+        gameFrame.contentWindow.postMessage({ channel: 'key', type: 'keydown', code: 'Space' }, '*');
+    }
+});
+document.addEventListener('keyup', function(e) {
+    if (e.code === 'Space') {
+        e.preventDefault();
+        gameFrame.contentWindow.postMessage({ channel: 'key', type: 'keyup', code: 'Space' }, '*');
+    }
+});
+</script>
+</body>
+</html>
